@@ -1,0 +1,46 @@
+Database Class Documentation
+The Database class provides an interface to manage a SQLite database for a meal planning system. This database handles information related to ingredients, recipes, user profiles, storage information, meal plans, and meal history.
+
+Class: Database
+Constructor
+__init__(self, db_file): Initializes the Database object and creates the SQLite database and tables if they don't already exist.
+Methods for Ingredient Management
+add_ingredient(self, ingredient): Adds a new ingredient to the database. If the ingredient exists, it replaces the existing one.
+delete_ingredient(self, name): Deletes an ingredient from the database by its name.
+print_ingredient(self, name): Prints an ingredient's details by its name.
+print_all_ingredients(self): Prints all ingredients in the database.
+Methods for Recipe Management
+add_recipe(self, recipe, ingredients): Adds a new recipe to the database. If the recipe exists, it replaces the existing one.
+delete_recipe(self, id): Deletes a recipe from the database by its ID.
+print_recipe(self, id): Prints a recipe's details by its ID.
+print_all_recipes(self): Prints all recipes in the database.
+Methods for Profile Management
+add_profile(self, profile, intolerances): Adds a new user profile to the database. If the profile exists, it replaces the existing one.
+delete_profile(self, name): Deletes a profile from the database by its name.
+print_profile(self, name): Prints a profile's details by its name.
+print_all_profiles(self): Prints all profiles in the database.
+Methods for Storage Management
+add_to_storage(self, ingredient, quantity): Adds an ingredient to storage or updates the quantity if it already exists.
+delete_from_storage(self, ingredient): Deletes an ingredient from storage.
+modify_storage_quantity(self, ingredient, quantity): Modifies the quantity of an ingredient in storage.
+print_storage(self): Prints all ingredients in storage.
+Methods for Fridge Management
+add_to_fridge(self, recipe_id, portions): Adds a recipe to the fridge or updates the portions if it already exists.
+delete_from_fridge(self, recipe_id): Deletes a recipe from the fridge.
+modify_fridge_portions(self, recipe_id, portions): Modifies the portions of a recipe in the fridge.
+print_fridge(self): Prints all recipes in the fridge.
+Methods for Freezer Management
+add_to_freezer(self, recipe_id, portions): Adds a recipe to the freezer or updates the portions if it already exists.
+delete_from_freezer(self, recipe_id): Deletes a recipe from the freezer.
+modify_freezer_portions(self, recipe_id, portions): Modifies the portions of a recipe in the freezer.
+print_freezer(self): Prints all recipes in the freezer.
+Methods for Meal Plan Management
+initialize_weekly_meal_plan(self): Initializes the weekly meal plan by creating entries for each day of the week.
+add_profile_to_meal(self, day, meal, profile_name): Adds a profile to a meal in the weekly meal plan.
+add_recipe_to_meal(self, recipe_id, day, meal): Adds a recipe to a specific meal of a specific day in the weekly meal plan.
+modify_meal_location(self, day, meal, location): Modifies the location of a specific meal of a specific day in the weekly meal plan.
+print_weekly_meal_plan(self): Prints the weekly meal plan including the meals for each day of the week and the profiles that will be present at that meal.
+get_weekly_meal_plan(self): Returns the weekly meal plan including the meals for each day of the week and the profiles that will be present at that meal.
+Methods for Meal History Management
+add_to_meal_history(self, recipe_id, date, score): Adds an entry to the meal history. If the total number of entries is more than 120, deletes the oldest one.
+get_meal_history(self): Returns the entire meal history.

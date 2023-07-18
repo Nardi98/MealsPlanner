@@ -104,8 +104,10 @@ class Database:
                                     id integer PRIMARY KEY,
                                     recipe_id integer NOT NULL,
                                     date text NOT NULL,
+                                    score integer NOT NULL,
                                     FOREIGN KEY(recipe_id) REFERENCES recipes(id)
                                 ); """
+
 
         try:
             self.conn.execute(ingredients_table)
@@ -513,6 +515,130 @@ class Database:
         cur.execute(sql, (location, day, meal))
         self.conn.commit()
 
+    def add_to_meal_history(self, recipe_id, date, score):
+        """
+        Add an entry to meal history. If the total number of entries is more than 120, delete the oldest one.
+        """
+        sql = 'INSERT INTO meal_history(recipe_id, date, score) VALUES(?, ?, ?)'
+        cur = self.conn.cursor()
+        cur.execute(sql, (recipe_id, date, score))
+        self.conn.commit()
+
+        # Check the number of entries
+        sql = 'SELECT COUNT(*) FROM meal_history'
+        cur.execute(sql)
+        count = cur.fetchone()[0]
+
+        if count > 120:
+            # Delete the oldest entry
+            sql = 'DELETE FROM meal_history WHERE id = (SELECT MIN(id) FROM meal_history)'
+            cur.execute(sql)
+            self.conn.commit()
+
+    def get_meal_history(self):
+        """
+        Return the entire meal history.
+        """
+        sql = 'SELECT * FROM meal_history'
+        cur = self.conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+
+        meal_history = []
+
+        for row in rows:
+            id, recipe_id, date, score = row
+            meal_history.append({
+                "id": id,
+                "recipe_id": recipe_id,
+                "date": date,
+                "score": score
+            })
+
+        return meal_history
+
+    def get_recipe_by_name(self, name):
+        """
+        Retrieves all information about a recipe based on its name.
+
+        Parameters:
+        name (str): The name of the recipe.
+
+        Returns:
+        dict: A dictionary containing all information about the recipe.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM Recipes WHERE name = ?", (name,))
+            recipe = cursor.fetchone()
+            return recipe
+        except Error as e:
+            print(e)
+
+    def get_recipe_by_id(self, id):
+        """
+        Retrieves all information about a recipe based on its ID.
+
+        Parameters:
+        id (int): The ID of the recipe.
+
+        Returns:
+        dict: A dictionary containing all information about the recipe.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM Recipes WHERE id = ?", (id,))
+            recipe = cursor.fetchone()
+            return recipe
+        except Error as e:
+            print(e)
+
+    def get_all_recipes(self):
+        """
+        Retrieves all recipes in the database.
+
+        Returns:
+        list: A list of dictionaries, each containing all information about a recipe.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM Recipes")
+            recipes = cursor.fetchall()
+            return recipes
+        except Error as e:
+            print(e)
+
+    def get_fridge_contents(self):
+        """
+        Retrieves the contents of the fridge.
+
+        Returns:
+        list: A list of dictionaries, each representing a recipe and its quantity in the fridge.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM Fridge")
+            fridge_contents = cursor.fetchall()
+            return fridge_contents
+        except Error as e:
+            print(e)
+
+    def get_freezer_contents(self):
+        """
+        Retrieves the contents of the freezer.
+
+        Returns:
+        list: A list of dictionaries, each representing a recipe and its quantity in the freezer.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM Freezer")
+            freezer_contents = cursor.fetchall()
+            return freezer_contents
+        except Error as e:
+            print(e)
+
+
 def main():
     # Create a Database object
     db = Database('test.db')
@@ -619,6 +745,20 @@ def main():
     # Print the weekly meal plan
     print("Weekly meal plan:")
     db.print_weekly_meal_plan()
+
+    # Add meal history
+    db.add_to_meal_history(1, '01-01-2023', 5)
+    db.add_to_meal_history(2, '02-01-2023', 4)
+
+    # Add enough meals to exceed the 120 limit
+    for i in range(3, 121):
+        db.add_to_meal_history(i, f'03-01-2023', 5)
+
+    # Get and print meal history
+    meal_history = db.get_meal_history()
+    print("Meal history:")
+    for meal in meal_history:
+        print(meal)
 
 if __name__ == "__main__":
     main()
