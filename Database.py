@@ -105,6 +105,7 @@ class Database:
                                     recipe_id integer NOT NULL,
                                     date text NOT NULL,
                                     score integer NOT NULL,
+                                    accepted integer NOT NULL,
                                     FOREIGN KEY(recipe_id) REFERENCES recipes(id)
                                 ); """
 
@@ -302,6 +303,26 @@ class Database:
         for row in rows:
             print(f"Name: {row[0]}, Celiac: {row[1]}")
 
+    def get_all_profiles(self):
+        """
+        Retrieve all profiles in the database.
+
+        Returns:
+        list: A list of dictionaries, each representing a profile.
+        """
+        sql = 'SELECT * FROM profiles'
+        cur = self.conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+
+        profiles = []
+        for row in rows:
+            profiles.append({
+                "name": row[0],
+                "celiac": row[1]
+            })
+
+        return profiles
     def add_to_storage(self, ingredient, quantity):
         """
         Add an ingredient to storage or update the quantity if it already exists.
@@ -515,13 +536,13 @@ class Database:
         cur.execute(sql, (location, day, meal))
         self.conn.commit()
 
-    def add_to_meal_history(self, recipe_id, date, score):
+    def add_to_meal_history(self, recipe_id, date, score, accepted):
         """
         Add an entry to meal history. If the total number of entries is more than 120, delete the oldest one.
         """
-        sql = 'INSERT INTO meal_history(recipe_id, date, score) VALUES(?, ?, ?)'
+        sql = 'INSERT INTO meal_history(recipe_id, date, score, accepted) VALUES(?, ?, ?, ?)'
         cur = self.conn.cursor()
-        cur.execute(sql, (recipe_id, date, score))
+        cur.execute(sql, (recipe_id, date, score, accepted))
         self.conn.commit()
 
         # Check the number of entries
@@ -547,12 +568,13 @@ class Database:
         meal_history = []
 
         for row in rows:
-            id, recipe_id, date, score = row
+            id, recipe_id, date, score, accepted = row
             meal_history.append({
                 "id": id,
                 "recipe_id": recipe_id,
                 "date": date,
-                "score": score
+                "score": score,
+                "accepted": accepted
             })
 
         return meal_history
@@ -747,12 +769,12 @@ def main():
     db.print_weekly_meal_plan()
 
     # Add meal history
-    db.add_to_meal_history(1, '01-01-2023', 5)
-    db.add_to_meal_history(2, '02-01-2023', 4)
+    db.add_to_meal_history(1, '01-01-2023', 5, 1)
+    db.add_to_meal_history(1, '04-01-2023', 4, 0)
 
     # Add enough meals to exceed the 120 limit
-    for i in range(3, 121):
-        db.add_to_meal_history(i, f'03-01-2023', 5)
+    for i in range(3, 5):
+        db.add_to_meal_history(1, f'08-01-2023', 5, 1)
 
     # Get and print meal history
     meal_history = db.get_meal_history()
