@@ -1,5 +1,6 @@
 import sqlite3
 from sqlite3 import Error
+import pandas as pd
 
 
 class Database:
@@ -22,8 +23,9 @@ class Database:
         # Ingredients table
         ingredients_table = """ CREATE TABLE IF NOT EXISTS ingredients (
                                     name text PRIMARY KEY,
-                                    type text NOT NULL CHECK(type IN ('beef', 'pork', 'chicken', 'fish', 'vegetables', 'animal origin', 'legumes', 'cerial', 'other')),
-                                    seasonality text,
+                                    type text NOT NULL CHECK(type IN ('beef', 'pork', 'chicken', 'fish', 'vegetables', 'animal origin', 'legumes', 'cerial', 'fruit', 'other')),
+                                    seasonality_start integer,
+                                    seasonality_end integer,
                                     contains_gluten integer NOT NULL
                                 ); """
 
@@ -104,11 +106,11 @@ class Database:
                                     id integer PRIMARY KEY,
                                     recipe_id integer NOT NULL,
                                     date text NOT NULL,
+                                    in_season integer NOT NULL,
                                     score integer NOT NULL,
                                     accepted integer NOT NULL,
                                     FOREIGN KEY(recipe_id) REFERENCES recipes(id)
                                 ); """
-
 
         try:
             self.conn.execute(ingredients_table)
@@ -135,8 +137,8 @@ class Database:
         Add a new ingredient to the database.
         If the ingredient exists, delete the existing one and insert the new one.
         """
-        sql = ''' REPLACE INTO ingredients(name, type, seasonality, contains_gluten)
-                  VALUES(?,?,?,?) '''
+        sql = ''' REPLACE INTO ingredients(name, type, seasonality_start, seasonality_end, contains_gluten)
+                  VALUES(?,?,?,?,?) '''
         cur = self.conn.cursor()
         cur.execute(sql, ingredient)
         self.conn.commit()
@@ -160,7 +162,8 @@ class Database:
         rows = cur.fetchall()
 
         for row in rows:
-            print(f"Name: {row[0]}, Type: {row[1]}, Seasonality: {row[2]}, Contains Gluten: {row[3]}")
+            print(f"Name: {row[0]}, Type: {row[1]}, Seasonality_start: {row[2]}, Seasonality_end:{row[3]}, Contains "
+                  f"Gluten: {row[3]}")
 
         for row in rows:
             print(row)
@@ -175,7 +178,8 @@ class Database:
         rows = cur.fetchall()
 
         for row in rows:
-            print(f"Name: {row[0]}, Type: {row[1]}, Seasonality: {row[2]}, Contains Gluten: {row[3]}")
+            print(f"Name: {row[0]}, Type: {row[1]}, Seasonality_start: {row[2]}, Seasonality_end:{row[3]}, Contains "
+                  f"Gluten: {row[3]}")
 
     def add_recipe(self, recipe, ingredients):
         """
@@ -217,7 +221,8 @@ class Database:
 
         for row in rows:
             print(
-                f"ID: {row[0]}, Name: {row[1]}, Type: {row[2]}, Time to prepare: {row[3]}, Portions: {row[4]}, Preservation days: {row[5]}, Can be frozen: {row[6]}, Score: {row[7]}")
+                f"ID: {row[0]}, Name: {row[1]}, Type: {row[2]}, Time to prepare: {row[3]}, Portions: {row[4]}, "
+                f"Preservation days: {row[5]}, Can be frozen: {row[6]}, Score: {row[7]}")
 
         # Print the ingredients associated with the recipe
         sql = 'SELECT ingredient_name, quantity FROM recipe_ingredients WHERE recipe_id=?'
@@ -240,6 +245,52 @@ class Database:
         for row in rows:
             print(
                 f"ID: {row[0]}, Name: {row[1]}, Type: {row[2]}, Time to prepare: {row[3]}, Portions: {row[4]}, Preservation days: {row[5]}, Can be frozen: {row[6]}, Score: {row[7]}")
+
+    def update_recipe_score(self, recipe_id, increment):
+        """Update the score of a recipe"""
+        if increment not in [-1, 1]:
+            print("The score increment is wrong. It should be 1 or -1.")
+            proceed = input("Do you want to modify the score anyway? (yes/no): ")
+            if proceed.lower() != 'yes':
+                return
+        if self.conn is not None:
+            try:
+                # Create a cursor object
+                cur = self.conn.cursor()
+                # Execute the UPDATE statement
+                cur.execute("UPDATE recipes SET score = score + ? WHERE id = ?", (increment, recipe_id,))
+                # Commit the changes
+                self.conn.commit()
+            except Error as e:
+                print(e)
+        else:
+            print("Error! Cannot create the database connection.")
+
+    def get_recipe_ingredients(self, recipe_id):
+        """
+        Retrieves the ingredients and their quantities for a recipe by its id, along with additional information
+        about each ingredient from the ingredients table.
+
+        Parameters:
+        recipe_id (int): The ID of the recipe.
+
+        Returns:
+        list: A list of dictionaries, each representing an ingredient and its details.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT ri.ingredient_name, ri.quantity, i.type, i.seasonality_start, i.seasonality_end, i.contains_gluten "
+                "FROM recipe_ingredients AS ri "
+                "JOIN ingredients AS i ON ri.ingredient_name = i.name "
+                "WHERE ri.recipe_id = ?",
+                (recipe_id,))
+            ingredients = cursor.fetchall()
+            return [{"name": name, "quantity": quantity, "type": type_, "seasonality_start": seasonality_start,
+                     "seasonality_end": seasonality_end, "contains_gluten": contains_gluten} for
+                    (name, quantity, type_, seasonality_start, seasonality_end, contains_gluten) in ingredients]
+        except Error as e:
+            print(e)
 
     def add_profile(self, profile, intolerances):
         """
@@ -291,6 +342,19 @@ class Database:
         for row in rows:
             print(f"Ingredient: {row[0]}")
 
+    def get_profile(self, name):
+        """
+        Print a profile's details by its name.
+        """
+        sql = 'SELECT * FROM profiles WHERE name=?'
+        cur = self.conn.cursor()
+        cur.execute(sql, (name,))
+        rows = cur.fetchall()
+
+        for row in rows:
+            return row
+
+
     def print_all_profiles(self):
         """
         Print all profiles in the database.
@@ -323,6 +387,7 @@ class Database:
             })
 
         return profiles
+
     def add_to_storage(self, ingredient, quantity):
         """
         Add an ingredient to storage or update the quantity if it already exists.
@@ -452,6 +517,7 @@ class Database:
         cur = self.conn.cursor()
         cur.execute(sql, (meal_id, profile_name))
         self.conn.commit()
+
     def initialize_weekly_meal_plan(self):
         """
         Initialize the weekly meal plan by creating entries for each day of the week.
@@ -516,7 +582,8 @@ class Database:
             })
 
         return weekly_meal_plan
-# Continue with other methods such as add_ingredient(), delete_ingredient(), print_ingredient(), etc.
+
+    # Continue with other methods such as add_ingredient(), delete_ingredient(), print_ingredient(), etc.
 
     def add_recipe_to_meal(self, recipe_id, day, meal):
         """
@@ -536,13 +603,13 @@ class Database:
         cur.execute(sql, (location, day, meal))
         self.conn.commit()
 
-    def add_to_meal_history(self, recipe_id, date, score, accepted):
+    def add_to_meal_history(self, recipe_id, date, in_season, score, accepted):
         """
         Add an entry to meal history. If the total number of entries is more than 120, delete the oldest one.
         """
-        sql = 'INSERT INTO meal_history(recipe_id, date, score, accepted) VALUES(?, ?, ?, ?)'
+        sql = 'INSERT INTO meal_history(recipe_id, date, in_season, score, accepted) VALUES(?, ?, ?, ?, ?)'
         cur = self.conn.cursor()
-        cur.execute(sql, (recipe_id, date, score, accepted))
+        cur.execute(sql, (recipe_id, date, in_season, score, accepted))
         self.conn.commit()
 
         # Check the number of entries
@@ -550,7 +617,7 @@ class Database:
         cur.execute(sql)
         count = cur.fetchone()[0]
 
-        if count > 120:
+        if count > 240:
             # Delete the oldest entry
             sql = 'DELETE FROM meal_history WHERE id = (SELECT MIN(id) FROM meal_history)'
             cur.execute(sql)
@@ -568,11 +635,12 @@ class Database:
         meal_history = []
 
         for row in rows:
-            id, recipe_id, date, score, accepted = row
+            id, recipe_id, date, in_season, score, accepted = row
             meal_history.append({
                 "id": id,
                 "recipe_id": recipe_id,
                 "date": date,
+                "in_season": in_season,
                 "score": score,
                 "accepted": accepted
             })
@@ -660,127 +728,109 @@ class Database:
         except Error as e:
             print(e)
 
+    def get_all_ingredients(self):
+        """
+        Retrieves all ingredients in the database.
+
+        Returns:
+        list: A list of tuples, each containing all information about an ingredient.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM ingredients")
+            ingredients = cursor.fetchall()
+            return ingredients
+        except Error as e:
+            print(e)
+
+    def get_ingredient(self, ingredient_name):
+        """
+        Retrieves all information of an ingredient based on its name.
+
+        Parameters:
+        ingredient_name (str): The name of the ingredient.
+
+        Returns:
+        dict: A dictionary containing all information about the ingredient.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM ingredients WHERE name = ?", (ingredient_name,))
+            ingredient_info = cursor.fetchone()
+
+            if ingredient_info is not None:
+                return {
+                    "name": ingredient_info[0],
+                    "type": ingredient_info[1],
+                    "seasonality_start": ingredient_info[2],
+                    "seasonality_end": ingredient_info[3],
+                    "contains_gluten": ingredient_info[4]
+                }
+            else:
+                print(f"No ingredient with name {ingredient_name} found in the database.")
+                return None
+
+        except Error as e:
+            print(e)
+
+    def load_data_from_csv(self, csv_file, table_name):
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(csv_file)
+
+        # Convert the DataFrame into a list of tuples
+        data_to_insert = [tuple(row) for row in df.values]
+
+        # Get the column names from the DataFrame
+        column_names = ','.join(df.columns)
+
+        # Prepare the placeholders for the values
+        placeholders = ','.join(['?'] * len(df.columns))
+
+        # Prepare the SQL statement
+        sql = f"INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})"
+
+        # Use a cursor to interact with the database
+        cursor = self.conn.cursor()
+
+        # Iterate over the data to insert
+        for row in data_to_insert:
+            try:
+                # Execute the SQL statement
+                cursor.execute(sql, row)
+
+            except sqlite3.IntegrityError as e:
+                # This catches violations of unique constraints and foreign key constraints
+                print(f"Error inserting {row} into {table_name}: {e}")
+
+        # Commit the changes
+        self.conn.commit()
+
+        # Close the cursor
+        cursor.close()
+
+    # Usage:
+    # conn = sqlite3.connect('your_database.db')
+    # load_data_from_csv(conn, 'ingredients.csv', 'ingredients')
+
 
 def main():
     # Create a Database object
     db = Database('test.db')
 
-    # Add some ingredients
-    db.add_ingredient(('Beef', 'beef', '01-01-2023-31-12-2023', 0))
-    db.add_ingredient(('Chicken', 'chicken', '01-01-2023-31-12-2023', 0))
-    db.add_ingredient(('Carrot', 'vegetables', '01-01-2023-31-12-2023', 0))
+    while True:
+        # Ask the user for the name of the CSV file
+        csv_file = input("Enter the name of the CSV file (or 'quit' to stop): ")
 
-    # Add some recipes
-    db.add_recipe((1, 'Beef Stew', 'main dish', 120, 4, 3, 1, 5), [('Beef', 500), ('Carrot', 200)])
-    db.add_recipe((2, 'Chicken Soup', 'main dish', 60, 4, 2, 1, 4), [('Chicken', 400)])
+        if csv_file.lower() == 'quit':
+            break
 
-    # Add some profiles
-    db.add_profile(('Alice', 0), ['Beef'])
-    db.add_profile(('Bob', 1), ['Carrot'])
+        # Ask the user for the name of the table
+        table_name = input("Enter the name of the table: ")
 
-    # Add to storage, fridge, and freezer
-    db.add_to_storage('Beef', 1000)
-    db.add_to_fridge(1, 2)
-    db.add_to_freezer(2, 3)
+        # Load the data from the CSV file into the table
+        db.load_data_from_csv(csv_file, table_name)
 
-    # Print all ingredients
-    print("All ingredients:")
-    db.print_all_ingredients()
-
-    # Print all recipes
-    print("All recipes:")
-    db.print_all_recipes()
-
-    # Print all profiles
-    print("All profiles:")
-    db.print_all_profiles()
-
-    # Print details of a specific recipe
-    print("Details of recipe with ID 1:")
-    db.print_recipe(1)
-
-    # Print details of a specific profile
-    print("Details of profile 'Alice':")
-    db.print_profile('Alice')
-
-    # Print contents of storage, fridge, and freezer
-    print("Storage contents:")
-    db.print_storage()
-
-    print("Fridge contents:")
-    db.print_fridge()
-
-    print("Freezer contents:")
-    db.print_freezer()
-
-    # Modify quantities in storage, fridge, and freezer
-    print("Modify quantities:")
-    db.modify_storage_quantity('Beef', 1500)
-    db.modify_fridge_portions(1, 3)
-    db.modify_freezer_portions(2, 4)
-
-    # Print contents of storage, fridge, and freezer after modification
-    print("Storage contents after modification:")
-    db.print_storage()
-
-    print("Fridge contents after modification:")
-    db.print_fridge()
-
-    print("Freezer contents after modification:")
-    db.print_freezer()
-
-    # Delete from storage, fridge, and freezer
-    print("Delete items:")
-    db.delete_from_storage('Beef')
-    db.delete_from_fridge(1)
-    db.delete_from_freezer(2)
-
-    # Print contents of storage, fridge, and freezer after deletion
-    print("Storage contents after deletion:")
-    db.print_storage()
-
-    print("Fridge contents after deletion:")
-    db.print_fridge()
-
-    print("Freezer contents after deletion:")
-    db.print_freezer()
-
-    # Initialize the weekly meal plan
-    db.initialize_weekly_meal_plan()
-
-    # Add profiles to meals
-    db.add_profile_to_meal('Alice', 'Monday', 'lunch')
-    db.add_profile_to_meal('Bob', 'Monday', 'lunch')
-
-
-    # Print the weekly meal plan
-    print("Weekly meal plan:")
-    db.print_weekly_meal_plan()
-
-    # Add a recipe to a meal
-    db.add_recipe_to_meal(1, 'Monday', 'lunch')
-    db.add_recipe_to_meal(2, 'Monday', 'dinner')
-
-    # Modify the location of a meal
-    db.modify_meal_location('Tuesday', 'lunch', 'work')
-
-    # Print the weekly meal plan
-    print("Weekly meal plan:")
-    db.print_weekly_meal_plan()
-
-    # Add meal history
-    db.add_to_meal_history(1, '01-01-2023', 5, 1)
-    db.add_to_meal_history(1, '04-01-2023', 4, 0)
-
-    # Add enough meals to exceed the 120 limit
-    for i in range(3, 5):
-        db.add_to_meal_history(1, f'08-01-2023', 5, 1)
-
-    # Get and print meal history
-    meal_history = db.get_meal_history()
-    print("Meal history:")
-    for meal in meal_history:
-        print(meal)
+    print(db.get_recipe_ingredients(1))
 
 if __name__ == "__main__":
     main()
